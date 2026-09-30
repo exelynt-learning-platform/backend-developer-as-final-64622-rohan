@@ -6,11 +6,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.List;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -42,29 +42,56 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String token = authHeader.substring(7);
 
-        if (!jwtService.isTokenValid(token)) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            return;
+        try {
+            if (!jwtService.isTokenValid(token)) {
+                sendUnauthorizedResponse(response, "Invalid or expired JWT token");
+                return;
+            }
+
+            String username = jwtService.extractUsername(token);
+
+            if (SecurityContextHolder.getContext().getAuthentication() == null) {
+
+                var userDetails =
+                        userDetailsService.loadUserByUsername(username);
+
+                UsernamePasswordAuthenticationToken authentication =
+                        new UsernamePasswordAuthenticationToken(
+                                userDetails,
+                                null,
+                                userDetails.getAuthorities()
+                        );
+
+                SecurityContextHolder.getContext()
+                        .setAuthentication(authentication);
+            }
+
+            filterChain.doFilter(request, response);
+
+        } catch (UsernameNotFoundException ex) {
+            SecurityContextHolder.clearContext();
+            sendUnauthorizedResponse(response, "User associated with JWT token was not found");
+
+        } catch (RuntimeException ex) {
+            SecurityContextHolder.clearContext();
+            sendUnauthorizedResponse(response, "Invalid or expired JWT token");
         }
+    }
 
-        String username = jwtService.extractUsername(token);
+    private void sendUnauthorizedResponse(
+            HttpServletResponse response,
+            String message) throws IOException {
 
-        if (SecurityContextHolder.getContext().getAuthentication() == null) {
+        SecurityContextHolder.clearContext();
 
-            var userDetails =
-                    userDetailsService.loadUserByUsername(username);
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
 
-            UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(
-                            userDetails,
-                            null,
-                            userDetails.getAuthorities()
-                    );
-
-            SecurityContextHolder.getContext()
-                    .setAuthentication(authentication);
-        }
-
-        filterChain.doFilter(request, response);
+        response.getWriter().write(
+                "{\"status\":401,\"error\":\"Unauthorized\",\"message\":\""
+                        + message
+                        + "\"}"
+        );
     }
 }

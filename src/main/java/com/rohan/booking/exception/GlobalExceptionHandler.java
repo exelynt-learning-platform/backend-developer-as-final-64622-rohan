@@ -13,10 +13,27 @@ import java.time.LocalDateTime;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleResourceNotFound(
             ResourceNotFoundException exception,
+            HttpServletRequest request) {
+
+        ErrorResponse errorResponse =
+                new ErrorResponse(
+                        LocalDateTime.now(),
+                        HttpStatus.NOT_FOUND.value(),
+                        exception.getMessage(),
+                        request.getRequestURI()
+                );
+
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(errorResponse);
+    }
+
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleUserNotFound(
+            UserNotFoundException exception,
             HttpServletRequest request) {
 
         ErrorResponse errorResponse =
@@ -92,7 +109,6 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.UNAUTHORIZED)
                 .body(errorResponse);
     }
-
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneralException(

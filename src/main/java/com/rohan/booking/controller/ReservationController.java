@@ -2,6 +2,7 @@ package com.rohan.booking.controller;
 
 import com.rohan.booking.dto.reservation.ReservationRequest;
 import com.rohan.booking.dto.reservation.ReservationResponse;
+import com.rohan.booking.dto.reservation.ReservationUpdateRequest;
 import com.rohan.booking.enums.ReservationStatus;
 import com.rohan.booking.service.ReservationService;
 import jakarta.validation.Valid;
@@ -92,7 +93,7 @@ public class ReservationController {
     @PutMapping("/{id}")
     public ResponseEntity<ReservationResponse> updateReservation(
             @PathVariable Long id,
-            @Valid @RequestBody ReservationRequest request) {
+            @Valid @RequestBody ReservationUpdateRequest request) {
 
         return ResponseEntity.ok(
                 reservationService.updateReservation(
@@ -100,7 +101,6 @@ public class ReservationController {
                         request)
         );
     }
-
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteReservation(

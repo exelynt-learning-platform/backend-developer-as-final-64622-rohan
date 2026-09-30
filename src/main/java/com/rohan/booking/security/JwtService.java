@@ -19,6 +19,12 @@ public class JwtService {
     private long expiration;
 
     private SecretKey getSigningKey() {
+
+        if (secret == null || secret.length() < 32) {
+            throw new IllegalStateException(
+                    "JWT secret must be at least 32 characters long");
+        }
+
         return Keys.hmacShaKeyFor(
                 secret.getBytes(StandardCharsets.UTF_8)
         );

@@ -2,11 +2,13 @@ package com.rohan.booking.service;
 
 import com.rohan.booking.dto.reservation.ReservationRequest;
 import com.rohan.booking.dto.reservation.ReservationResponse;
+import com.rohan.booking.dto.reservation.ReservationUpdateRequest;
 import com.rohan.booking.entity.Reservation;
 import com.rohan.booking.entity.Resource;
 import com.rohan.booking.entity.User;
 import com.rohan.booking.enums.ReservationStatus;
 import com.rohan.booking.exception.ResourceNotFoundException;
+import com.rohan.booking.exception.UserNotFoundException;
 import com.rohan.booking.repository.ReservationRepository;
 import com.rohan.booking.repository.ResourceRepository;
 import com.rohan.booking.repository.UserRepository;
@@ -40,7 +42,6 @@ public class ReservationService {
             ReservationRequest request,
             String username) {
 
-
         if (!request.getEndTime().isAfter(request.getStartTime())) {
             throw new IllegalArgumentException(
                     "End time must be after start time");
@@ -48,7 +49,7 @@ public class ReservationService {
 
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() ->
-                        new RuntimeException("User not found"));
+                        new UserNotFoundException("User not found"));
 
         Resource resource = resourceRepository.findById(
                         request.getResourceId())
@@ -94,16 +95,24 @@ public class ReservationService {
             String sortBy,
             String sortDir) {
 
-        if (minPrice != null && minPrice.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("minPrice cannot be negative");
+        if (minPrice != null
+                && minPrice.compareTo(BigDecimal.ZERO) < 0) {
+
+            throw new IllegalArgumentException(
+                    "minPrice cannot be negative");
         }
 
-        if (maxPrice != null && maxPrice.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("maxPrice cannot be negative");
+        if (maxPrice != null
+                && maxPrice.compareTo(BigDecimal.ZERO) < 0) {
+
+            throw new IllegalArgumentException(
+                    "maxPrice cannot be negative");
         }
 
-        if (minPrice != null && maxPrice != null
+        if (minPrice != null
+                && maxPrice != null
                 && minPrice.compareTo(maxPrice) > 0) {
+
             throw new IllegalArgumentException(
                     "minPrice cannot be greater than maxPrice");
         }
@@ -116,14 +125,6 @@ public class ReservationService {
         if (size <= 0 || size > 100) {
             throw new IllegalArgumentException(
                     "Size must be between 1 and 100");
-        }
-
-        if (page < 0) {
-            page = 0;
-        }
-
-        if (size <= 0) {
-            size = 10;
         }
 
         if (sortBy == null || sortBy.isBlank()) {
@@ -141,6 +142,7 @@ public class ReservationService {
             throw new IllegalArgumentException(
                     "Invalid sortBy field");
         }
+
         if (sortDir == null || sortDir.isBlank()) {
             sortDir = "desc";
         }
@@ -220,8 +222,7 @@ public class ReservationService {
                                 .findAll(pageable);
             }
 
-        }
-        else {
+        } else {
 
             if (status != null
                     && minPrice != null
@@ -289,13 +290,45 @@ public class ReservationService {
 
     public ReservationResponse updateReservation(
             Long id,
-            ReservationRequest request) {
+            ReservationUpdateRequest request) {
 
         Reservation reservation =
                 reservationRepository.findById(id)
                         .orElseThrow(() ->
                                 new ResourceNotFoundException(
                                         "Reservation not found"));
+
+        /*
+         * Allow status-only updates.
+         * This is required when an admin wants to change
+         * PENDING -> CONFIRMED or PENDING -> CANCELLED
+         * without changing the reservation details.
+         */
+        if (request.getStatus() != null
+                && request.getResourceId() == null
+                && request.getStartTime() == null
+                && request.getEndTime() == null) {
+
+            reservation.setStatus(request.getStatus());
+            reservation.setUpdatedAt(LocalDateTime.now());
+
+            Reservation updatedReservation =
+                    reservationRepository.save(reservation);
+
+            return mapToResponse(updatedReservation);
+        }
+
+        /*
+         * If reservation details are being changed,
+         * all required fields must be provided.
+         */
+        if (request.getResourceId() == null
+                || request.getStartTime() == null
+                || request.getEndTime() == null) {
+
+            throw new IllegalArgumentException(
+                    "resourceId, startTime and endTime are required when updating reservation details");
+        }
 
         if (!request.getEndTime()
                 .isAfter(request.getStartTime())) {
@@ -333,6 +366,7 @@ public class ReservationService {
 
         return mapToResponse(updatedReservation);
     }
+
     public void deleteReservation(Long id) {
 
         Reservation reservation =
